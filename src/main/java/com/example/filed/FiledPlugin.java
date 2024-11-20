@@ -1,164 +1,119 @@
 package com.example.filed;
 
+import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitRunnable;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.List;
 
 public class FiledPlugin extends JavaPlugin {
-
-    private File linkFile;
-    private List<String> cachedLinks;
-    private int intervalSeconds;
-    private File downloadFolder;
-    private int downloadSpeedMbps;
+    private FileConfiguration config;
+    private int downloadSpeed; // Kecepatan download dalam Mbps
+    private int delay; // Delay dalam detik untuk membaca file link.txt
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
-        loadConfig();
+        config = getConfig();
+        downloadSpeed = config.getInt("download-speed", 5); // Default 5 Mbps
+        delay = config.getInt("read-delay-seconds", 10); // Default 10 detik untuk membaca link.txt
 
-        linkFile = new File(getDataFolder(), "link.txt");
-
-        if (!getDataFolder().exists()) {
-            getDataFolder().mkdirs();
-        }
-
-        if (!linkFile.exists()) {
-            try {
-                linkFile.createNewFile();
-                getLogger().info("File link.txt telah dibuat.");
-            } catch (IOException e) {
-                getLogger().severe("Gagal membuat file link.txt: " + e.getMessage());
-            }
-        }
-
-        startLinkFileWatcher();
-    }
-
-    private void loadConfig() {
-        reloadConfig();
-        intervalSeconds = getConfig().getInt("read-interval", 60);
-        String folderPath = getConfig().getString("download-folder", "plugins/filed/downloads");
-        downloadSpeedMbps = getConfig().getInt("download-speed", 1);
-
-        if (downloadSpeedMbps > 5) {
-            downloadSpeedMbps = 5; // Batasi kecepatan download maksimal 5 Mbps
-            getLogger().warning("Kecepatan download melebihi batas maksimal, diatur ke 5 Mbps.");
-        }
-
-        downloadFolder = new File(folderPath);
-        if (!downloadFolder.exists()) {
-            if (downloadFolder.mkdirs()) {
-                getLogger().info("Folder tujuan download berhasil dibuat: " + downloadFolder.getAbsolutePath());
-            } else {
-                getLogger().warning("Gagal membuat folder tujuan download: " + downloadFolder.getAbsolutePath());
-            }
-        }
-
-        getLogger().info("Konfigurasi dimuat ulang. Interval pembacaan: " + intervalSeconds + " detik.");
-        getLogger().info("Kecepatan download: " + downloadSpeedMbps + " Mbps.");
-    }
-
-    private void startLinkFileWatcher() {
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                cachedLinks = readLinksFromFile();
-                getLogger().info("File link.txt diperbarui. Total link: " + cachedLinks.size());
-            }
-        }.runTaskTimer(this, 0, intervalSeconds * 20L);
-    }
-
-    private List<String> readLinksFromFile() {
-        try {
-            return java.nio.file.Files.readAllLines(linkFile.toPath());
-        } catch (IOException e) {
-            getLogger().severe("Gagal membaca file link.txt: " + e.getMessage());
-            return List.of();
-        }
+        getLogger().info("Plugin Filed diaktifkan!");
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (command.getName().equalsIgnoreCase("filed")) {
-            if (args.length == 0) {
-                sender.sendMessage("Gunakan: /filed <reload|download>");
-                return true;
-            }
-
-            if (args[0].equalsIgnoreCase("reload")) {
-                loadConfig();
-                sender.sendMessage("Konfigurasi berhasil dimuat ulang.");
-                return true;
-            }
-
-            if (args[0].equalsIgnoreCase("download")) {
-                if (args.length == 2) {
-                    String link = args[1];
-                    sender.sendMessage("Memulai download untuk: " + link);
-                    new Thread(() -> downloadFile(link, new File(downloadFolder, getFileNameFromUrl(link)), sender)).start();
-                } else {
-                    sender.sendMessage("Gunakan: /filed download <link>");
-                }
-                return true;
-            }
+        if (args.length == 0) {
+            sender.sendMessage("Usage: /filed download <URL> | /filed reload");
+            return false;
         }
+
+        if (args[0].equalsIgnoreCase("download") && args.length > 1) {
+            String fileUrl = args[1];
+            sender.sendMessage("Mengunduh file dari: " + fileUrl);
+            startDownload(fileUrl, sender);
+            return true;
+        }
+
+        if (args[0].equalsIgnoreCase("reload")) {
+            reloadConfig();
+            config = getConfig();
+            downloadSpeed = config.getInt("download-speed", 5);
+            delay = config.getInt("read-delay-seconds", 10);
+            sender.sendMessage("Konfigurasi telah dimuat ulang!");
+            return true;
+        }
+
         return false;
     }
 
-    private void downloadFile(String fileUrl, File destination, CommandSender sender) {
-        try {
-            URL url = new URL(fileUrl);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.connect();
+    private void startDownload(String fileUrl, CommandSender sender) {
+        Bukkit.getScheduler().runTask(this, () -> {
+            try {
+                URL url = new URL(fileUrl);
+                String fileName = new File(url.getFile()).getName();
+                File destinationFile = new File(getDataFolder(), "downloads/" + fileName);
 
-            int fileSize = connection.getContentLength();
-            InputStream inputStream = connection.getInputStream();
-            FileOutputStream outputStream = new FileOutputStream(destination);
+                // Membaca ukuran file
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("HEAD");
+                connection.connect();
+                int fileSize = connection.getContentLength();
+                connection.disconnect();
 
-            byte[] buffer = new byte[1024];
-            int bytesRead;
-            int totalBytesRead = 0;
-            int bufferSizePerSecond = downloadSpeedMbps * 1024 * 1024 / 8;
-
-            long startTime = System.currentTimeMillis();
-
-            while ((bytesRead = inputStream.read(buffer)) != -1) {
-                outputStream.write(buffer, 0, bytesRead);
-                totalBytesRead += bytesRead;
-
-                // Hitung progres dan tampilkan ke pengguna
-                int progress = (int) ((double) totalBytesRead / fileSize * 100);
-                double downloadedMB = totalBytesRead / (1024.0 * 1024.0);
-                sender.sendMessage(String.format("Downloading %s: %d%% (%.2f MB)", destination.getName(), progress, downloadedMB));
-
-                // Batasi kecepatan download
-                long elapsedTime = System.currentTimeMillis() - startTime;
-                if (elapsedTime < 1000) {
-                    Thread.sleep(1000 - elapsedTime);
+                // Membuat folder jika tidak ada
+                if (!destinationFile.getParentFile().exists()) {
+                    destinationFile.getParentFile().mkdirs();
                 }
-                startTime = System.currentTimeMillis();
-            }
 
-            sender.sendMessage("Download selesai: " + destination.getAbsolutePath());
-            inputStream.close();
-            outputStream.close();
-        } catch (Exception e) {
-            sender.sendMessage("Gagal mendownload file: " + e.getMessage());
-            getLogger().severe("Gagal mendownload file dari " + fileUrl + ": " + e.getMessage());
-        }
+                downloadFile(url, destinationFile, fileSize, sender);
+            } catch (IOException e) {
+                sender.sendMessage("Gagal mengunduh file: " + e.getMessage());
+            }
+        });
     }
 
-    private String getFileNameFromUrl(String url) {
-        return new File(url).getName();
+    private void downloadFile(URL url, File destination, int fileSize, CommandSender sender) {
+        Bukkit.getScheduler().runTask(this, () -> {
+            try (InputStream inputStream = url.openStream();
+                 FileOutputStream fileOutputStream = new FileOutputStream(destination)) {
+
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                int totalBytesRead = 0;
+
+                while ((bytesRead = inputStream.read(buffer)) != -1) {
+                    totalBytesRead += bytesRead;
+                    fileOutputStream.write(buffer, 0, bytesRead);
+
+                    // Menghitung persentase
+                    int percentage = (int) ((double) totalBytesRead / fileSize * 100);
+                    int mbDownloaded = totalBytesRead / (1024 * 1024); // Mengonversi ke MB
+
+                    // Menampilkan progres download
+                    sender.sendMessage("Downloading: " + destination.getName() + " " + percentage + "% (" + mbDownloaded + "MB downloaded)");
+
+                    // Menunggu sesuai dengan kecepatan download yang disetting
+                    limitDownloadSpeed(bytesRead);
+                }
+
+                sender.sendMessage("Download selesai: " + destination.getName());
+            } catch (IOException e) {
+                sender.sendMessage("Gagal mengunduh file: " + e.getMessage());
+            }
+        });
+    }
+
+    private void limitDownloadSpeed(int bytesRead) {
+        try {
+            int delayInMillis = (int) (bytesRead * 8.0 / (downloadSpeed * 1024 * 1024) * 1000); // Menghitung delay untuk mencapai kecepatan download yang diinginkan
+            Thread.sleep(delayInMillis);
+        } catch (InterruptedException e) {
+            getLogger().warning("Thread download terinterupsi: " + e.getMessage());
+        }
     }
 }
