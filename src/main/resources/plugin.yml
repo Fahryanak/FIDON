@@ -1,0 +1,6 @@
+name: filed
+main: com.example.filed.DownloadPlugin
+version: 1.0
+api-version: 1.21
+description: Plugin to download files from URLs listed in link.txt
+author: HANNZZ
