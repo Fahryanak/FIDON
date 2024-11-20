@@ -1,8 +1,8 @@
 name: Filed
-version: 1.3
+version: 1.0
 main: com.example.filed.FiledPlugin
 api-version: 1.21
 commands:
   filed:
     description: Menyediakan perintah download dan reload
-    usage: /filed <download|reload>
+    usage: /filed <download|reload|setfolder|setspeed>
