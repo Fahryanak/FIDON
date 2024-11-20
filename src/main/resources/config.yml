@@ -1,0 +1,8 @@
+# Interval pembacaan ulang file link.txt (dalam detik)
+read-interval: 60
+
+# Lokasi folder tujuan penyimpanan file yang diunduh
+download-folder: plugins/filed/downloads
+
+# Kecepatan download dalam Mbps (maksimal 5 Mbps)
+download-speed: 1
