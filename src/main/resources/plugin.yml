@@ -1,6 +1,6 @@
 name: Filed
-version: 1.0
-main: com.example.filed.FiledPlugin  # Pastikan ini sesuai dengan nama kelas utama Anda
+version: 1.3
+main: com.example.filed.FiledPlugin
 api-version: 1.21
 commands:
   filed:
