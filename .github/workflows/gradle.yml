@@ -2,9 +2,9 @@ name: Java CI with Gradle
 
 on:
   push:
-    branches: [ "tri.txt" ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ "tri.txt" ]
+    branches: [ "main" ]
 
 jobs:
   build:
