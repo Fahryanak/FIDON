@@ -1,5 +1,8 @@
 # Kecepatan download dalam Mbps (maksimal 5 Mbps)
-download-speed: 1
+download-speed: 5
 
 # Waktu dalam detik untuk menunggu sebelum membaca link.txt lagi
 read-delay-seconds: 10
+
+# Folder tempat file yang diunduh akan disimpan
+download-folder: "plugins/"
