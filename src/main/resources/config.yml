@@ -1,8 +1,13 @@
-# Kecepatan download dalam Mbps (maksimal 5 Mbps)
+# Konfigurasi untuk plugin Filed
+
+# Kecepatan download maksimum dalam Mbps
 download-speed: 5
 
-# Waktu dalam detik untuk menunggu sebelum membaca link.txt lagi
-read-delay-seconds: 10
+# Folder tempat file unduhan disimpan
+download-folder: downloads
 
-# Folder tempat file yang diunduh akan disimpan
-download-folder: "plugins/"
+# Maksimal ukuran file yang dapat diunduh (dalam MB)
+max-file-size: 2048  # Default 2 GB
+
+# Jumlah maksimum unduhan simultan yang diizinkan
+max-concurrent-downloads: 3
