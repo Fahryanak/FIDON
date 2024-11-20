@@ -1,14 +1,17 @@
-name: Java CI with Gradle
+name: BUILDER FILED
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
+    paths:
+      - "tri.txt"
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+    paths:
+      - "tri.txt"
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     permissions:
       contents: read
