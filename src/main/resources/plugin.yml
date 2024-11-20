@@ -1,6 +1,8 @@
-name: filed
-main: com.example.filed.FiledPlugin
+name: Filed
 version: 1.0
+main: com.example.filed.FiledPlugin  # Pastikan ini sesuai dengan nama kelas utama Anda
 api-version: 1.21
-description: Plugin to download files from URLs listed in link.txt
-author: HANNZZ
+commands:
+  filed:
+    description: Menyediakan perintah download dan reload
+    usage: /filed <download|reload>
