@@ -4,10 +4,7 @@
 download-speed: 5
 
 # Folder tempat file unduhan disimpan
-download-folder: downloads
-
-# Maksimal ukuran file yang dapat diunduh (dalam MB)
-max-file-size: 2048  # Default 2 GB
+download-folder: plugins
 
 # Jumlah maksimum unduhan simultan yang diizinkan
 max-concurrent-downloads: 3
