@@ -1,11 +1,10 @@
 name: Filed
+version: 1.0.0
 main: com.example.filed.FiledPlugin
-version: 1.3
-description: Plugin untuk mengunduh file dari internet ke server Minecraft
-
+api-version: 1.19
 commands:
   filed:
-    description: Mengelola unduhan file
-    usage: /filed <command>
-    aliases:
-      - filed
+    description: Perintah utama untuk plugin Filed.
+    usage: /filed <subcommand>
+    permission: filed.use
+    permission-message: Anda tidak memiliki izin untuk menggunakan perintah ini.
