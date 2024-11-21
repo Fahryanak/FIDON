@@ -7,15 +7,18 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.*;
-import java.io.BufferedWriter;
+import java.io.BufferedWriter; // Tambahkan ini
 import java.io.File;
-import java.io.FileWriter;
+import java.io.FileWriter; // Tambahkan ini
 import java.io.IOException;
+import java.net.URL;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 
 public class FiledPlugin extends JavaPlugin {
     private FileConfiguration config;
