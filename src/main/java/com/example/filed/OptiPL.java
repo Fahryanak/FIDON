@@ -2,30 +2,52 @@ package com.example.filed;
 
 import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitRunnable;
-import java.util.HashMap;
-import java.util.Map;
 
 public class OptiPL {
-    private final Map<String, Integer> pluginLoad = new HashMap<>();
+    private static final long MAX_MEMORY_USAGE = 50 * 1024 * 1024; // Batas penggunaan memori 50MiB dalam byte
 
-    public void optimize(FiledPlugin plugin) {
+    /**
+     * Mengaktifkan optimisasi performa untuk plugin.
+     * 
+     * @param plugin Plugin Filed yang sedang berjalan.
+     */
+    public void enableOptimization(FiledPlugin plugin) {
+        // Jalankan optimisasi setiap 10 detik
         new BukkitRunnable() {
             @Override
             public void run() {
-                adjustPerformance(plugin);
+                optimizePerformance(plugin);
             }
-        }.runTaskTimer(plugin, 0L, 20L * 60); // Jalankan setiap menit
+        }.runTaskTimer(plugin, 0L, 20L * 10); // 10 detik (20 tick * 10)
     }
 
-    private void adjustPerformance(FiledPlugin plugin) {
-        int totalTasks = plugin.getServer().getScheduler().getPendingTasks().size();
-        pluginLoad.put(plugin.getName(), totalTasks);
+    /**
+     * Logika utama untuk optimisasi performa plugin.
+     * 
+     * @param plugin Plugin Filed yang sedang berjalan.
+     */
+    private void optimizePerformance(FiledPlugin plugin) {
+        // Cek total penggunaan memori oleh JVM
+        Runtime runtime = Runtime.getRuntime();
+        long usedMemory = runtime.totalMemory() - runtime.freeMemory();
 
-        if (totalTasks > plugin.getMaxConcurrentDownloads()) {
-            Bukkit.getLogger().warning("Server under heavy load. Adjusting download speed and task limits.");
-            plugin.setDownloadSpeed(plugin.getDownloadSpeed() / 2);
-            plugin.setMaxConcurrentDownloads(plugin.getMaxConcurrentDownloads() / 2);
+        if (usedMemory > MAX_MEMORY_USAGE) {
+            // Jika memori melebihi batas, hentikan unduhan sementara
+            Bukkit.getLogger().warning("Memori plugin mendekati batas 50MiB. Menghentikan tugas sementara.");
+            plugin.pauseAllDownloads();
         } else {
+            // Jika memori cukup, lanjutkan unduhan
+            plugin.resumeAllDownloads();
+        }
+
+        // Sesuaikan kecepatan unduhan jika server sibuk
+        int totalTasks = plugin.getServer().getScheduler().getPendingTasks().size();
+        if (totalTasks > plugin.getMaxConcurrentDownloads()) {
+            Bukkit.getLogger().warning("Server sedang sibuk. Menurunkan kecepatan unduh dan tugas simultan.");
+            plugin.setDownloadSpeed(plugin.getDownloadSpeed() / 2); // Kurangi kecepatan unduh
+            plugin.setMaxConcurrentDownloads(Math.max(1, plugin.getMaxConcurrentDownloads() / 2)); // Kurangi batas tugas
+        } else {
+            // Kembalikan pengaturan default jika server normal
             plugin.setDownloadSpeed(plugin.getConfig().getInt("download-speed"));
             plugin.setMaxConcurrentDownloads(plugin.getConfig().getInt("max-concurrent-downloads"));
         }
