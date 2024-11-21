@@ -7,37 +7,32 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.*;
-import java.io.BufferedWriter; // Tambahkan ini
-import java.io.File;
-import java.io.FileWriter; // Tambahkan ini
-import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
+import java.util.*;
 
 public class FiledPlugin extends JavaPlugin {
     private FileConfiguration config;
-    private int downloadSpeed; // Kecepatan download dalam Mbps
-    private String downloadFolder; // Folder tempat file akan disimpan
-    private int maxFileSize; // Maksimum ukuran file dalam MB
-    private int maxConcurrentDownloads; // Jumlah maksimum unduhan simultan
+    private int downloadSpeed;
+    private String downloadFolder;
+    private int maxFileSize;
+    private int maxConcurrentDownloads;
     private final Map<String, DownloadTask> downloadTasks = new HashMap<>();
     private final Queue<String> downloadQueue = new LinkedList<>();
     private final List<String> downloadHistory = new ArrayList<>();
+    private OptiPL optimizer;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
         config = getConfig();
-        downloadSpeed = config.getInt("download-speed", 5); // Default 5 Mbps
+        downloadSpeed = config.getInt("download-speed", 5);
         downloadFolder = config.getString("download-folder", "downloads");
-        maxFileSize = config.getInt("max-file-size", 2048); // Default 2 GB
-        maxConcurrentDownloads = config.getInt("max-concurrent-downloads", 3); // Default 3
+        maxFileSize = config.getInt("max-file-size", 2048);
+        maxConcurrentDownloads = config.getInt("max-concurrent-downloads", 3);
+
+        optimizer = new OptiPL();
+        optimizer.optimize(this);
 
         getLogger().info("Plugin Filed diaktifkan!");
     }
@@ -69,25 +64,11 @@ public class FiledPlugin extends JavaPlugin {
                 return true;
 
             case "list":
-                if (downloadTasks.isEmpty() && downloadQueue.isEmpty()) {
-                    sender.sendMessage("Tidak ada unduhan yang sedang berjalan atau dalam antrean.");
-                } else {
-                    sender.sendMessage("Unduhan aktif:");
-                    downloadTasks.forEach((url, task) -> sender.sendMessage("- " + url + ": " + task.getProgress() + "%"));
-                    sender.sendMessage("Antrean unduhan:");
-                    for (String url : downloadQueue) {
-                        sender.sendMessage("- " + url);
-                    }
-                }
+                listDownloads(sender);
                 return true;
 
             case "history":
-                if (downloadHistory.isEmpty()) {
-                    sender.sendMessage("Tidak ada riwayat unduhan.");
-                } else {
-                    sender.sendMessage("Riwayat unduhan:");
-                    downloadHistory.forEach(sender::sendMessage);
-                }
+                showHistory(sender);
                 return true;
 
             case "reload":
@@ -103,6 +84,28 @@ public class FiledPlugin extends JavaPlugin {
             default:
                 sender.sendMessage("Perintah tidak dikenal. Gunakan /filed untuk melihat bantuan.");
                 return false;
+        }
+    }
+
+    private void listDownloads(CommandSender sender) {
+        if (downloadTasks.isEmpty() && downloadQueue.isEmpty()) {
+            sender.sendMessage("Tidak ada unduhan yang sedang berjalan atau dalam antrean.");
+        } else {
+            sender.sendMessage("Unduhan aktif:");
+            downloadTasks.forEach((url, task) -> sender.sendMessage("- " + url + ": " + task.getProgress() + "%"));
+            sender.sendMessage("Antrean unduhan:");
+            for (String url : downloadQueue) {
+                sender.sendMessage("- " + url);
+            }
+        }
+    }
+
+    private void showHistory(CommandSender sender) {
+        if (downloadHistory.isEmpty()) {
+            sender.sendMessage("Tidak ada riwayat unduhan.");
+        } else {
+            sender.sendMessage("Riwayat unduhan:");
+            downloadHistory.forEach(sender::sendMessage);
         }
     }
 
@@ -122,7 +125,6 @@ public class FiledPlugin extends JavaPlugin {
             String fileName = new File(url.getFile()).getName();
             File destinationFile = new File(getDataFolder(), downloadFolder + "/" + fileName);
 
-            // Membuat folder jika tidak ada
             if (!destinationFile.getParentFile().exists()) {
                 destinationFile.getParentFile().mkdirs();
             }
@@ -171,7 +173,7 @@ public class FiledPlugin extends JavaPlugin {
             getLogger().warning("Gagal menulis riwayat unduhan: " + e.getMessage());
         }
     }
-    
+
     public int getDownloadSpeed() {
         return downloadSpeed;
     }
@@ -188,4 +190,3 @@ public class FiledPlugin extends JavaPlugin {
         this.maxConcurrentDownloads = maxConcurrentDownloads;
     }
 }
-
