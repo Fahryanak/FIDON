@@ -1,87 +1,118 @@
 package com.example.filed;
 
+import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
+
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class DownloadTask implements Runnable {
     private final FiledPlugin plugin;
-    private final URL url;
-    private final File destination;
-    private final int downloadSpeed;
+    private final URL fileUrl;
+    private final File destinationFile;
+    private final int downloadSpeed; // Kecepatan unduhan dalam byte per detik
     private final CommandSender sender;
-    private int progress = 0;
+    private final AtomicBoolean paused = new AtomicBoolean(false); // Mengontrol status pause/resume
+    private long bytesDownloaded = 0; // Byte yang telah diunduh
+    private long totalFileSize = -1; // Ukuran total file (diambil dari header)
 
-    public DownloadTask(FiledPlugin plugin, URL url, File destination, int downloadSpeed, CommandSender sender) {
+    public DownloadTask(FiledPlugin plugin, URL fileUrl, File destinationFile, int downloadSpeed, CommandSender sender) {
         this.plugin = plugin;
-        this.url = url;
-        this.destination = destination;
+        this.fileUrl = fileUrl;
+        this.destinationFile = destinationFile;
         this.downloadSpeed = downloadSpeed;
         this.sender = sender;
     }
 
     @Override
     public void run() {
-        try {
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            int fileSize = connection.getContentLength();
-            connection.disconnect();
+        try (HttpURLConnection connection = (HttpURLConnection) fileUrl.openConnection()) {
+            connection.setRequestMethod("GET");
+            connection.setDoInput(true);
+            connection.connect();
 
-            long downloadedBytes = destination.exists() ? destination.length() : 0;
-            if (downloadedBytes > 0) {
-                sender.sendMessage("Melanjutkan unduhan: " + destination.getName());
-            }
+            totalFileSize = connection.getContentLengthLong();
+            InputStream inputStream = connection.getInputStream();
+            BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
+            FileOutputStream fileOutputStream = new FileOutputStream(destinationFile);
 
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestProperty("Range", "bytes=" + downloadedBytes + "-");
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            long startTime = System.currentTimeMillis();
 
-            try (InputStream inputStream = connection.getInputStream();
-                 RandomAccessFile file = new RandomAccessFile(destination, "rw")) {
-
-                file.seek(downloadedBytes);
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                long totalBytesRead = downloadedBytes;
-                long startTime = System.currentTimeMillis();
-                long lastUpdateTime = System.currentTimeMillis();
-
-                sender.sendMessage("Memulai unduhan: " + destination.getName());
-                while ((bytesRead = inputStream.read(buffer)) != -1) {
-                    file.write(buffer, 0, bytesRead);
-                    totalBytesRead += bytesRead;
-
-                    long currentTime = System.currentTimeMillis();
-                    if (currentTime - lastUpdateTime >= 500) { // Update setiap 500ms atau 2 kali per detik
-                        int newProgress = (int) ((double) totalBytesRead / fileSize * 100);
-                        progress = newProgress;
-                        long elapsedTime = (currentTime - startTime) / 1000; // Dalam detik
-                        long speed = totalBytesRead / (elapsedTime + 1); // Byte per detik
-                        long eta = (fileSize - totalBytesRead) / (speed > 0 ? speed : 1); // Detik
-                        sender.sendMessage("Downloading: " + progress + "%, ETA: " + eta + "s");
-                        lastUpdateTime = currentTime;
+            while ((bytesRead = bufferedInputStream.read(buffer)) != -1) {
+                if (paused.get()) {
+                    // Jika unduhan dijeda, tunggu hingga dilanjutkan
+                    synchronized (paused) {
+                        while (paused.get()) {
+                            paused.wait();
+                        }
                     }
-
-                    limitDownloadSpeed(bytesRead);
                 }
 
-                sender.sendMessage("Unduhan selesai: " + destination.getName());
-                plugin.addDownloadToHistory(destination.getName());
-                plugin.onDownloadComplete(url.toString());
+                fileOutputStream.write(buffer, 0, bytesRead);
+                bytesDownloaded += bytesRead;
+
+                // Menghitung dan mengirimkan pembaruan progres unduhan
+                if (System.currentTimeMillis() - startTime > 1000) {
+                    startTime = System.currentTimeMillis();
+                    sendProgressUpdate();
+                }
+
+                // Kontrol kecepatan unduhan
+                if (bytesDownloaded >= downloadSpeed) {
+                    try {
+                        long elapsedTime = System.currentTimeMillis() - startTime;
+                        if (elapsedTime < 1000) {
+                            Thread.sleep(1000 - elapsedTime); // Tidur jika terlalu cepat
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    bytesDownloaded = 0; // Reset hitungan setelah kontrol kecepatan
+                }
             }
-        } catch (Exception e) {
-            sender.sendMessage("Gagal mengunduh file: " + e.getMessage());
-        } finally {
-            plugin.onDownloadComplete(url.toString());
+
+            bufferedInputStream.close();
+            fileOutputStream.close();
+
+            plugin.onDownloadComplete(fileUrl.toString());
+            plugin.addDownloadToHistory(destinationFile.getName());
+            sendCompletionMessage();
+
+        } catch (IOException | InterruptedException e) {
+            plugin.getLogger().warning("Gagal mengunduh file: " + e.getMessage());
         }
     }
 
-    private void limitDownloadSpeed(int bytesRead) throws InterruptedException {
-        double delay = (bytesRead * 8.0 / (downloadSpeed * 1024 * 1024)) * 1000;
-        Thread.sleep((long) delay);
+    private void sendProgressUpdate() {
+        double progress = (double) bytesDownloaded / totalFileSize * 100;
+        Bukkit.getScheduler().runTask(plugin, () -> sender.sendMessage("Unduhan " + fileUrl + " progress: " + (int) progress + "%"));
     }
 
-    public int getProgress() {
-        return progress;
+    private void sendCompletionMessage() {
+        Bukkit.getScheduler().runTask(plugin, () -> sender.sendMessage("Unduhan selesai: " + fileUrl));
+    }
+
+    public void pauseDownload() {
+        paused.set(true);
+    }
+
+    public void resumeDownload() {
+        synchronized (paused) {
+            paused.set(false);
+            paused.notify(); // Melanjutkan proses unduhan
+        }
+    }
+
+    public String getProgress() {
+        if (totalFileSize == -1) return "0%";
+        return String.format("%.2f%%", (double) bytesDownloaded / totalFileSize * 100);
+    }
+
+    public File getDestinationFile() {
+        return destinationFile;
     }
 }
