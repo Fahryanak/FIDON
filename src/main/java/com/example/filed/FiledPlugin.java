@@ -21,6 +21,8 @@ public class FiledPlugin extends JavaPlugin {
     private final List<String> downloadHistory = new ArrayList<>();
     private OptiPL optimizer;
 
+    private final List<DownloadTask> activeDownloadTasks = new ArrayList<>(); // Daftar unduhan aktif
+
     @Override
     public void onEnable() {
         saveDefaultConfig();
@@ -76,6 +78,14 @@ public class FiledPlugin extends JavaPlugin {
                 downloadFolder = config.getString("download-folder", "downloads");
                 maxConcurrentDownloads = config.getInt("max-concurrent-downloads", 3);
                 sender.sendMessage("Konfigurasi telah dimuat ulang!");
+                return true;
+
+            case "pause":
+                pauseAllDownloads(sender);
+                return true;
+
+            case "resume":
+                resumeAllDownloads(sender);
                 return true;
 
             default:
@@ -140,6 +150,7 @@ public class FiledPlugin extends JavaPlugin {
 
             DownloadTask task = new DownloadTask(this, url, destinationFile, downloadSpeed, sender);
             downloadTasks.put(fileUrl, task);
+            addActiveDownloadTask(task); // Menambahkan task unduhan ke daftar unduhan aktif
             Bukkit.getScheduler().runTaskAsynchronously(this, task);
         } catch (Exception e) {
             sender.sendMessage("Gagal memulai unduhan: " + e.getMessage());
@@ -166,6 +177,7 @@ public class FiledPlugin extends JavaPlugin {
 
     public void onDownloadComplete(String fileUrl) {
         downloadTasks.remove(fileUrl);
+        removeActiveDownloadTask(downloadTasks.get(fileUrl)); // Menghapus tugas unduhan dari daftar unduhan aktif
         if (!downloadQueue.isEmpty()) {
             String nextUrl = downloadQueue.poll();
             Bukkit.getScheduler().runTask(this, () -> startDownload(nextUrl, Bukkit.getConsoleSender()));
@@ -183,6 +195,28 @@ public class FiledPlugin extends JavaPlugin {
         }
     }
 
+    public void pauseAllDownloads(CommandSender sender) {
+        for (DownloadTask task : activeDownloadTasks) {
+            task.pauseDownload();
+        }
+        sender.sendMessage("Semua unduhan dihentikan sementara.");
+    }
+
+    public void resumeAllDownloads(CommandSender sender) {
+        for (DownloadTask task : activeDownloadTasks) {
+            task.resumeDownload();
+        }
+        sender.sendMessage("Semua unduhan dilanjutkan.");
+    }
+
+    public void addActiveDownloadTask(DownloadTask task) {
+        activeDownloadTasks.add(task);
+    }
+
+    public void removeActiveDownloadTask(DownloadTask task) {
+        activeDownloadTasks.remove(task);
+    }
+
     public int getDownloadSpeed() {
         return downloadSpeed;
     }
@@ -197,5 +231,14 @@ public class FiledPlugin extends JavaPlugin {
 
     public void setMaxConcurrentDownloads(int maxConcurrentDownloads) {
         this.maxConcurrentDownloads = maxConcurrentDownloads;
+    }
+
+    // Fungsi untuk memuat ulang konfigurasi
+    public void reloadConfig() {
+        saveDefaultConfig();
+        config = getConfig();
+        downloadSpeed = config.getInt("download-speed", 5);
+        downloadFolder = config.getString("download-folder", "downloads");
+        maxConcurrentDownloads = config.getInt("max-concurrent-downloads", 3);
     }
 }
