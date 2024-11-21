@@ -1,11 +1,4 @@
-# Konfigurasi untuk plugin Filed
-
-# Kecepatan download maksimum dalam Mbps
-download-speed: 2
-
-# Folder tempat file unduhan disimpan
-# Pilihan: main, plugins, atau lokasi kustom
-download-folder: plugins
-
-# Jumlah maksimum unduhan simultan yang diizinkan
-max-concurrent-downloads: 3
+download-speed: 5 # Kecepatan unduh dalam Mbps
+download-folder: plugins # Pilihan: main, plugins, custom
+custom-download-path: downloads # Digunakan jika download-folder adalah 'custom'
+max-concurrent-downloads: 3 # Jumlah unduhan bersamaan maksimum
