@@ -1,7 +1,6 @@
 package com.example.filed;
 
 import org.bukkit.command.CommandSender;
-
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -11,16 +10,14 @@ public class DownloadTask implements Runnable {
     private final URL url;
     private final File destination;
     private final int downloadSpeed;
-    private final int maxFileSize;
     private final CommandSender sender;
     private int progress = 0;
 
-    public DownloadTask(FiledPlugin plugin, URL url, File destination, int downloadSpeed, int maxFileSize, CommandSender sender) {
+    public DownloadTask(FiledPlugin plugin, URL url, File destination, int downloadSpeed, CommandSender sender) {
         this.plugin = plugin;
         this.url = url;
         this.destination = destination;
         this.downloadSpeed = downloadSpeed;
-        this.maxFileSize = maxFileSize;
         this.sender = sender;
     }
 
@@ -30,11 +27,6 @@ public class DownloadTask implements Runnable {
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             int fileSize = connection.getContentLength();
             connection.disconnect();
-
-            if (fileSize > maxFileSize * 1024 * 1024) {
-                sender.sendMessage("Gagal: File terlalu besar (maks: " + maxFileSize + " MB).");
-                return;
-            }
 
             long downloadedBytes = destination.exists() ? destination.length() : 0;
             if (downloadedBytes > 0) {
@@ -52,19 +44,22 @@ public class DownloadTask implements Runnable {
                 int bytesRead;
                 long totalBytesRead = downloadedBytes;
                 long startTime = System.currentTimeMillis();
+                long lastUpdateTime = System.currentTimeMillis();
 
                 sender.sendMessage("Memulai unduhan: " + destination.getName());
                 while ((bytesRead = inputStream.read(buffer)) != -1) {
                     file.write(buffer, 0, bytesRead);
                     totalBytesRead += bytesRead;
 
-                    int newProgress = (int) ((double) totalBytesRead / fileSize * 100);
-                    if (newProgress != progress) {
+                    long currentTime = System.currentTimeMillis();
+                    if (currentTime - lastUpdateTime >= 500) { // Update setiap 500ms atau 2 kali per detik
+                        int newProgress = (int) ((double) totalBytesRead / fileSize * 100);
                         progress = newProgress;
-                        long elapsedTime = System.currentTimeMillis() - startTime;
-                        long speed = totalBytesRead / (elapsedTime / 1000 + 1);
-                        long eta = (fileSize - totalBytesRead) / speed;
+                        long elapsedTime = (currentTime - startTime) / 1000; // Dalam detik
+                        long speed = totalBytesRead / (elapsedTime + 1); // Byte per detik
+                        long eta = (fileSize - totalBytesRead) / (speed > 0 ? speed : 1); // Detik
                         sender.sendMessage("Downloading: " + progress + "%, ETA: " + eta + "s");
+                        lastUpdateTime = currentTime;
                     }
 
                     limitDownloadSpeed(bytesRead);
