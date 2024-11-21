@@ -171,4 +171,21 @@ public class FiledPlugin extends JavaPlugin {
             getLogger().warning("Gagal menulis riwayat unduhan: " + e.getMessage());
         }
     }
+    
+    public int getDownloadSpeed() {
+        return downloadSpeed;
+    }
+
+    public void setDownloadSpeed(int downloadSpeed) {
+        this.downloadSpeed = downloadSpeed;
+    }
+
+    public int getMaxConcurrentDownloads() {
+        return maxConcurrentDownloads;
+    }
+
+    public void setMaxConcurrentDownloads(int maxConcurrentDownloads) {
+        this.maxConcurrentDownloads = maxConcurrentDownloads;
+    }
 }
+
