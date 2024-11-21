@@ -11,7 +11,7 @@ public class DownloadTask implements Runnable {
     private final URL url;
     private final File destination;
     private final int downloadSpeed;
-    private final int maxFileSize; // Dalam MB
+    private final int maxFileSize;
     private final CommandSender sender;
     private int progress = 0;
 
@@ -28,29 +28,26 @@ public class DownloadTask implements Runnable {
     public void run() {
         try {
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            int fileSize = connection.getContentLength(); // Dalam byte
+            int fileSize = connection.getContentLength();
             connection.disconnect();
 
-            // Validasi ukuran file
             if (fileSize > maxFileSize * 1024 * 1024) {
                 sender.sendMessage("Gagal: File terlalu besar (maks: " + maxFileSize + " MB).");
                 return;
             }
 
-            // Cek resume jika file sudah ada
             long downloadedBytes = destination.exists() ? destination.length() : 0;
             if (downloadedBytes > 0) {
                 sender.sendMessage("Melanjutkan unduhan: " + destination.getName());
             }
 
-            // Mulai unduhan
             connection = (HttpURLConnection) url.openConnection();
             connection.setRequestProperty("Range", "bytes=" + downloadedBytes + "-");
 
             try (InputStream inputStream = connection.getInputStream();
                  RandomAccessFile file = new RandomAccessFile(destination, "rw")) {
 
-                file.seek(downloadedBytes); // Lanjutkan dari byte terakhir
+                file.seek(downloadedBytes);
                 byte[] buffer = new byte[8192];
                 int bytesRead;
                 long totalBytesRead = downloadedBytes;
@@ -61,17 +58,15 @@ public class DownloadTask implements Runnable {
                     file.write(buffer, 0, bytesRead);
                     totalBytesRead += bytesRead;
 
-                    // Update progress
                     int newProgress = (int) ((double) totalBytesRead / fileSize * 100);
                     if (newProgress != progress) {
                         progress = newProgress;
                         long elapsedTime = System.currentTimeMillis() - startTime;
-                        long speed = totalBytesRead / (elapsedTime / 1000 + 1); // Byte per detik
-                        long eta = (fileSize - totalBytesRead) / speed; // Detik
+                        long speed = totalBytesRead / (elapsedTime / 1000 + 1);
+                        long eta = (fileSize - totalBytesRead) / speed;
                         sender.sendMessage("Downloading: " + progress + "%, ETA: " + eta + "s");
                     }
 
-                    // Batasi kecepatan
                     limitDownloadSpeed(bytesRead);
                 }
 
@@ -87,7 +82,7 @@ public class DownloadTask implements Runnable {
     }
 
     private void limitDownloadSpeed(int bytesRead) throws InterruptedException {
-        double delay = (bytesRead * 8.0 / (downloadSpeed * 1024 * 1024)) * 1000; // ms
+        double delay = (bytesRead * 8.0 / (downloadSpeed * 1024 * 1024)) * 1000;
         Thread.sleep((long) delay);
     }
 
