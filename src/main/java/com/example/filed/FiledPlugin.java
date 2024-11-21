@@ -38,28 +38,26 @@ public class FiledPlugin extends JavaPlugin {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0) {
-            sender.sendMessage("Usage: /filed download <URL> <location> | /filed batch <file> <location> | /filed list | /filed history | /filed reload");
+            sender.sendMessage("Usage: /filed download <URL> | /filed batch <file> | /filed list | /filed history | /filed reload");
             return false;
         }
 
         switch (args[0].toLowerCase()) {
             case "download":
-                if (args.length > 2) {
+                if (args.length > 1) {
                     String fileUrl = args[1];
-                    String location = args[2];
-                    queueDownload(fileUrl, location, sender);
+                    queueDownload(fileUrl, sender);
                 } else {
-                    sender.sendMessage("Usage: /filed download <URL> <location>");
+                    sender.sendMessage("Usage: /filed download <URL>");
                 }
                 return true;
 
             case "batch":
-                if (args.length > 2) {
+                if (args.length > 1) {
                     String filePath = args[1];
-                    String location = args[2];
-                    batchDownload(filePath, location, sender);
+                    batchDownload(filePath, sender);
                 } else {
-                    sender.sendMessage("Usage: /filed batch <file> <location>");
+                    sender.sendMessage("Usage: /filed batch <file>");
                 }
                 return true;
 
@@ -108,23 +106,23 @@ public class FiledPlugin extends JavaPlugin {
         }
     }
 
-    private void queueDownload(String fileUrl, String location, CommandSender sender) {
+    private void queueDownload(String fileUrl, CommandSender sender) {
         if (downloadTasks.size() >= maxConcurrentDownloads) {
             sender.sendMessage("Unduhan telah mencapai batas maksimal (" + maxConcurrentDownloads + "). Menambahkan ke antrean.");
             downloadQueue.add(fileUrl);
             return;
         }
 
-        startDownload(fileUrl, location, sender);
+        startDownload(fileUrl, sender);
     }
 
-    private void startDownload(String fileUrl, String location, CommandSender sender) {
+    private void startDownload(String fileUrl, CommandSender sender) {
         try {
             URL url = new URL(fileUrl);
             String fileName = new File(url.getFile()).getName();
             File destinationFile;
 
-            switch (location.toLowerCase()) {
+            switch (downloadFolder.toLowerCase()) {
                 case "main":
                     destinationFile = new File(getDataFolder().getParentFile().getParentFile(), fileName);
                     break;
@@ -132,7 +130,7 @@ public class FiledPlugin extends JavaPlugin {
                     destinationFile = new File(getDataFolder().getParentFile(), fileName);
                     break;
                 default:
-                    destinationFile = new File(location, fileName);
+                    destinationFile = new File(downloadFolder, fileName);
                     break;
             }
 
@@ -148,7 +146,7 @@ public class FiledPlugin extends JavaPlugin {
         }
     }
 
-    private void batchDownload(String filePath, String location, CommandSender sender) {
+    private void batchDownload(String filePath, CommandSender sender) {
         File file = new File(getDataFolder(), filePath);
         if (!file.exists()) {
             sender.sendMessage("File tidak ditemukan: " + filePath);
@@ -158,7 +156,7 @@ public class FiledPlugin extends JavaPlugin {
         try {
             List<String> urls = Files.readAllLines(file.toPath());
             for (String url : urls) {
-                queueDownload(url, location, sender);
+                queueDownload(url, sender);
             }
             sender.sendMessage("Batch download dimulai untuk " + urls.size() + " file.");
         } catch (IOException e) {
@@ -170,7 +168,7 @@ public class FiledPlugin extends JavaPlugin {
         downloadTasks.remove(fileUrl);
         if (!downloadQueue.isEmpty()) {
             String nextUrl = downloadQueue.poll();
-            Bukkit.getScheduler().runTask(this, () -> startDownload(nextUrl, downloadFolder, Bukkit.getConsoleSender()));
+            Bukkit.getScheduler().runTask(this, () -> startDownload(nextUrl, Bukkit.getConsoleSender()));
         }
     }
 
